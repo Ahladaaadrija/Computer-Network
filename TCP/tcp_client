@@ -1,48 +1,136 @@
 #include <stdio.h>
-#include <sys/types.h>
-#include <sys/socket.h>
-#include <netinet/in.h>
-#include <arpa/inet.h>
-#include <string.h>
 #include <stdlib.h>
+#include <string.h>
 #include <unistd.h>
+#include <arpa/inet.h>
+#include <sys/stat.h>
 
-int main()
-{
-    int sockfd, port;
-    struct sockaddr_in server;
-    char buffer[100];
-    printf("Enter port number: ");
-    scanf("%d", &port);
-    getchar();
-    sockfd = socket(AF_INET, SOCK_STREAM, 0);
-    if (sockfd < 0) {
-        perror("Socket failed");
-        exit(1);
+#define PORT 8080
+#define BUFFER_SIZE 1024
+
+void get_unique_filename(char *filename) {
+    struct stat buffer;
+    if (stat(filename, &buffer) != 0)
+        return;
+
+    char name[256], ext[256];
+    char newname[512];
+    int count = 1;
+
+    char *dot = strrchr(filename, '.');
+    if (dot) {
+        strncpy(name, filename, dot - filename);
+        name[dot - filename] = '\0';
+        strcpy(ext, dot);
+    } else {
+        strcpy(name, filename);
+        ext[0] = '\0';
     }
-    memset(&server, 0, sizeof(server));
-    server.sin_family = AF_INET;
-    server.sin_port = htons(port);
-    server.sin_addr.s_addr = inet_addr("127.0.0.1");
-    if (connect(sockfd, (struct sockaddr *)&server, sizeof(server)) < 0) {
-        perror("Connection failed");
-        exit(1);
+
+    do {
+        sprintf(newname, "%s(%d)%s", name, count++, ext);
+    } while (stat(newname, &buffer) == 0);
+
+    strcpy(filename, newname);
+}
+
+void receive_list(int sock) {
+    long size;
+    recv(sock, &size, sizeof(size), 0);
+
+    char *buffer = malloc(size + 1);
+    long received = 0;
+
+    while (received < size) {
+        int n = recv(sock, buffer + received, size - received, 0);
+        received += n;
     }
+
+    buffer[size] = '\0';
+    printf("\nFiles on Server:\n%s\n", buffer);
+    free(buffer);
+}
+
+void receive_file(int sock, char *filename) {
+    long size;
+    recv(sock, &size, sizeof(size), 0);
+    if (size <= 0) {
+        printf("File not found on server.\n");
+        return;
+    }
+
+    get_unique_filename(filename);
+
+    FILE *fp = fopen(filename, "wb");
+    char buffer[BUFFER_SIZE];
+    long received = 0;
+
+    while (received < size) {
+        int n = recv(sock, buffer, BUFFER_SIZE, 0);
+        fwrite(buffer, 1, n, fp);
+        received += n;
+    }
+
+    fclose(fp);
+    printf("File downloaded successfully.\n");
+}
+
+void send_file(int sock, char *filename) {
+    FILE *fp = fopen(filename, "rb");
+    if (!fp) {
+        long size = -1;
+        send(sock, &size, sizeof(size), 0);
+        return;
+    }
+
+    fseek(fp, 0, SEEK_END);
+    long size = ftell(fp);
+    rewind(fp);
+
+    send(sock, &size, sizeof(size), 0);
+
+    char buffer[BUFFER_SIZE];
+    while (!feof(fp)) {
+        int n = fread(buffer, 1, BUFFER_SIZE, fp);
+        send(sock, buffer, n, 0);
+    }
+
+    fclose(fp);
+    printf("File uploaded successfully.\n");
+}
+
+int main() {
+    int sock;
+    struct sockaddr_in addr;
+    char command[BUFFER_SIZE];
+
+    sock = socket(AF_INET, SOCK_STREAM, 0);
+
+    addr.sin_family = AF_INET;
+    addr.sin_port = htons(PORT);
+    addr.sin_addr.s_addr = inet_addr("127.0.0.1");
+
+    connect(sock, (struct sockaddr *)&addr, sizeof(addr));
+
     while (1) {
-        printf("Client: ");
-        fgets(buffer, sizeof(buffer), stdin);
-        write(sockfd, buffer, strlen(buffer) + 1);
-        if (strcmp(buffer, "exit\n") == 0) {
-            printf("Client exiting...\n");
-            break;
-        }
-        read(sockfd, buffer, sizeof(buffer));
-        printf("Server: %s", buffer);
-        if (strcmp(buffer, "exit\n") == 0) {
-            printf("Server exited. Client closing...\n");
+        printf("\nCommands: LIST | GET <file> | PUT <file> | EXIT\n");
+        printf("Enter command: ");
+        fgets(command, sizeof(command), stdin);
+        command[strcspn(command, "\n")] = 0;
+
+        send(sock, command, sizeof(command), 0);
+
+        if (strncmp(command, "LIST", 4) == 0) {
+            receive_list(sock);
+        } else if (strncmp(command, "GET", 3) == 0) {
+            receive_file(sock, command + 4);
+        } else if (strncmp(command, "PUT", 3) == 0) {
+            send_file(sock, command + 4);
+        } else if (strncmp(command, "EXIT", 4) == 0) {
             break;
         }
     }
-    close(sockfd);
+
+    close(sock);
     return 0;
 }
