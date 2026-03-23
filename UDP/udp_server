@@ -1,0 +1,54 @@
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <unistd.h>
+#include <arpa/inet.h>
+
+#define BUF_SIZE 1024
+
+int main() {
+    int sockfd;
+    struct sockaddr_in server_addr, client_addr;
+    socklen_t addr_len = sizeof(client_addr);
+    char buffer[BUF_SIZE];
+    int port;
+    printf("Enter port number to listen on: ");
+    scanf("%d", &port);
+    while (getchar() != '\n');
+    sockfd = socket(AF_INET, SOCK_DGRAM, 0);
+    if (sockfd < 0) {
+        perror("Socket creation failed");
+        exit(EXIT_FAILURE);
+    }
+    server_addr.sin_family = AF_INET;
+    server_addr.sin_addr.s_addr = INADDR_ANY;
+    server_addr.sin_port = htons(port);
+    if (bind(sockfd, (struct sockaddr*)&server_addr, sizeof(server_addr)) < 0) {
+        perror("Bind failed");
+        close(sockfd);
+        exit(EXIT_FAILURE);
+    }
+    printf("UDP Server listening on port %d...\n", port);
+    printf("Waiting for a client...\n");
+    while (1) {
+        int bytes = recvfrom(sockfd, buffer, BUF_SIZE - 1, 0,
+                             (struct sockaddr*)&client_addr, &addr_len);
+        buffer[bytes] = '\0';
+        printf("\nClient: %s\n", buffer);
+        if (strcmp(buffer, "quit") == 0) {
+            printf("Client quit. Waiting for another client...\n");
+            continue;   // server stays alive
+        }
+        printf("Server: ");
+        fgets(buffer, BUF_SIZE, stdin);
+        buffer[strcspn(buffer, "\n")] = 0;
+        sendto(sockfd, buffer, strlen(buffer), 0,
+               (struct sockaddr*)&client_addr, addr_len);
+        if (strcmp(buffer, "quit") == 0) {
+            printf("Server quitting. Client will be notified.\n");
+            break;
+        }
+    }
+    close(sockfd);
+    return 0;
+}
