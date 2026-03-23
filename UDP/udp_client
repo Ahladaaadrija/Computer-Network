@@ -1,0 +1,56 @@
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <unistd.h>
+#include <arpa/inet.h>
+
+#define BUF_SIZE 1024
+
+int main() {
+    int sockfd;
+    struct sockaddr_in server_addr;
+    socklen_t addr_len = sizeof(server_addr);
+    char buffer[BUF_SIZE];
+    int port;
+    char ip[20];
+    printf("Enter server IP: ");
+    scanf("%s", ip);
+    printf("Enter server port: ");
+    scanf("%d", &port);
+    while (getchar() != '\n');
+    sockfd = socket(AF_INET, SOCK_DGRAM, 0);
+    if (sockfd < 0) {
+        perror("Socket creation failed");
+        exit(EXIT_FAILURE);
+    }
+    server_addr.sin_family = AF_INET;
+    server_addr.sin_port = htons(port);
+    if (inet_pton(AF_INET, ip, &server_addr.sin_addr) <= 0) {
+        perror("Invalid address");
+        close(sockfd);
+        exit(EXIT_FAILURE);
+    }
+    printf("Connected to %s:%d (UDP)\n", ip, port);
+    printf("Type 'quit' to exit\n");
+    while (1) {
+        printf("Client: ");
+        fgets(buffer, BUF_SIZE, stdin);
+        buffer[strcspn(buffer, "\n")] = 0;
+        sendto(sockfd, buffer, strlen(buffer), 0,
+               (struct sockaddr*)&server_addr, addr_len);
+        if (strcmp(buffer, "quit") == 0) {
+            printf("Client quitting...\n");
+            break;
+        }
+        int bytes = recvfrom(sockfd, buffer, BUF_SIZE - 1, 0,
+                             (struct sockaddr*)&server_addr, &addr_len);
+        buffer[bytes] = '\0';
+        if (strcmp(buffer, "quit") == 0) {
+            printf("Server quit. Disconnecting...\n");
+            break;
+        }
+        printf("Server: %s\n", buffer);
+    }
+    close(sockfd);
+    return 0;
+}
