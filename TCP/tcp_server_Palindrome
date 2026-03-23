@@ -1,23 +1,22 @@
 #include <stdio.h>
-#include <sys/types.h>
-#include <sys/socket.h>
-#include <netinet/in.h>
+#include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
+#include <arpa/inet.h>
 
 int isPalindrome(char str[])
 {
     int i, j;
     int len = strlen(str);
 
-    if(str[len-1] == '\n')
-        str[len-1] = '\0';
+    if (str[len - 1] == '\n')
+        str[len - 1] = '\0';
 
     len = strlen(str);
 
-    for(i = 0, j = len - 1; i < j; i++, j--)
+    for (i = 0, j = len - 1; i < j; i++, j--)
     {
-        if(str[i] != str[j])
+        if (str[i] != str[j])
             return 0;
     }
     return 1;
@@ -31,28 +30,52 @@ int main()
     char buffer[100];
 
     printf("Enter port number: ");
-    scanf("%d",&port);
+    scanf("%d", &port);
 
     sd = socket(AF_INET, SOCK_STREAM, 0);
+    if (sd < 0)
+    {
+        perror("Socket failed");
+        exit(1);
+    }
 
     memset(&server, 0, sizeof(server));
     server.sin_family = AF_INET;
     server.sin_port = htons(port);
     server.sin_addr.s_addr = INADDR_ANY;
 
-    bind(sd, (struct sockaddr *)&server, sizeof(server));
-    listen(sd, 5);
+    if (bind(sd, (struct sockaddr *)&server, sizeof(server)) < 0)
+    {
+        perror("Bind failed");
+        exit(1);
+    }
 
+    listen(sd, 5);
     printf("Server listening...\n");
 
     cli_len = sizeof(cli);
     connfd = accept(sd, (struct sockaddr *)&cli, &cli_len);
 
-    while(1)
+    if (connfd < 0)
     {
-        read(connfd, buffer, sizeof(buffer));
+        perror("Accept failed");
+        exit(1);
+    }
 
-        if(strcmp(buffer,"exit\n")==0)
+    while (1)
+    {
+        memset(buffer, 0, sizeof(buffer));  // 🔥 important
+
+        int n = read(connfd, buffer, sizeof(buffer));
+        if (n <= 0)
+        {
+            printf("Client disconnected\n");
+            break;
+        }
+
+        buffer[n] = '\0'; // 🔥 ensure string
+
+        if (strcmp(buffer, "exit\n") == 0)
         {
             printf("Client requested exit\n");
             break;
@@ -60,12 +83,12 @@ int main()
 
         printf("Client: %s", buffer);
 
-        if(isPalindrome(buffer))
+        if (isPalindrome(buffer))
             strcpy(buffer, "Palindrome\n");
         else
             strcpy(buffer, "Not Palindrome\n");
 
-        write(connfd, buffer, strlen(buffer)+1);
+        write(connfd, buffer, strlen(buffer));
     }
 
     close(connfd);
