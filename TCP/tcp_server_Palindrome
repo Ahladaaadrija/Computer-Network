@@ -1,0 +1,73 @@
+#include <stdio.h>
+#include <sys/types.h>
+#include <sys/socket.h>
+#include <netinet/in.h>
+#include <string.h>
+#include <unistd.h>
+
+int isPalindrome(char str[])
+{
+    int i, j;
+    int len = strlen(str);
+
+    if(str[len-1] == '\n')
+        str[len-1] = '\0';
+
+    len = strlen(str);
+
+    for(i = 0, j = len - 1; i < j; i++, j--)
+    {
+        if(str[i] != str[j])
+            return 0;
+    }
+    return 1;
+}
+
+int main()
+{
+    int sd, connfd, port;
+    struct sockaddr_in server, cli;
+    socklen_t cli_len;
+    char buffer[100];
+
+    printf("Enter port number: ");
+    scanf("%d",&port);
+
+    sd = socket(AF_INET, SOCK_STREAM, 0);
+
+    memset(&server, 0, sizeof(server));
+    server.sin_family = AF_INET;
+    server.sin_port = htons(port);
+    server.sin_addr.s_addr = INADDR_ANY;
+
+    bind(sd, (struct sockaddr *)&server, sizeof(server));
+    listen(sd, 5);
+
+    printf("Server listening...\n");
+
+    cli_len = sizeof(cli);
+    connfd = accept(sd, (struct sockaddr *)&cli, &cli_len);
+
+    while(1)
+    {
+        read(connfd, buffer, sizeof(buffer));
+
+        if(strcmp(buffer,"exit\n")==0)
+        {
+            printf("Client requested exit\n");
+            break;
+        }
+
+        printf("Client: %s", buffer);
+
+        if(isPalindrome(buffer))
+            strcpy(buffer, "Palindrome\n");
+        else
+            strcpy(buffer, "Not Palindrome\n");
+
+        write(connfd, buffer, strlen(buffer)+1);
+    }
+
+    close(connfd);
+    close(sd);
+}
