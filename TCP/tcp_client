@@ -1,0 +1,48 @@
+#include <stdio.h>
+#include <sys/types.h>
+#include <sys/socket.h>
+#include <netinet/in.h>
+#include <arpa/inet.h>
+#include <string.h>
+#include <stdlib.h>
+#include <unistd.h>
+
+int main()
+{
+    int sockfd, port;
+    struct sockaddr_in server;
+    char buffer[100];
+    printf("Enter port number: ");
+    scanf("%d", &port);
+    getchar();
+    sockfd = socket(AF_INET, SOCK_STREAM, 0);
+    if (sockfd < 0) {
+        perror("Socket failed");
+        exit(1);
+    }
+    memset(&server, 0, sizeof(server));
+    server.sin_family = AF_INET;
+    server.sin_port = htons(port);
+    server.sin_addr.s_addr = inet_addr("127.0.0.1");
+    if (connect(sockfd, (struct sockaddr *)&server, sizeof(server)) < 0) {
+        perror("Connection failed");
+        exit(1);
+    }
+    while (1) {
+        printf("Client: ");
+        fgets(buffer, sizeof(buffer), stdin);
+        write(sockfd, buffer, strlen(buffer) + 1);
+        if (strcmp(buffer, "exit\n") == 0) {
+            printf("Client exiting...\n");
+            break;
+        }
+        read(sockfd, buffer, sizeof(buffer));
+        printf("Server: %s", buffer);
+        if (strcmp(buffer, "exit\n") == 0) {
+            printf("Server exited. Client closing...\n");
+            break;
+        }
+    }
+    close(sockfd);
+    return 0;
+}
