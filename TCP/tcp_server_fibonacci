@@ -1,0 +1,72 @@
+#include <stdio.h>
+#include <sys/types.h>
+#include <sys/socket.h>
+#include <netinet/in.h>
+#include <string.h>
+#include <unistd.h>
+
+void fibonacci(int n, char result[])
+{
+    int a = 0, b = 1, c, i;
+    char temp[20];
+
+    result[0] = '\0';
+
+    for(i = 0; i < n; i++)
+    {
+        sprintf(temp, "%d ", a);
+        strcat(result, temp);
+
+        c = a + b;
+        a = b;
+        b = c;
+    }
+}
+
+int main()
+{
+    int sd, connfd, port, n;
+    struct sockaddr_in server, cli;
+    socklen_t cli_len;
+    char buffer[100];
+
+    printf("Enter port number: ");
+    scanf("%d",&port);
+
+    sd = socket(AF_INET, SOCK_STREAM, 0);
+
+    memset(&server, 0, sizeof(server));
+    server.sin_family = AF_INET;
+    server.sin_port = htons(port);
+    server.sin_addr.s_addr = INADDR_ANY;
+
+    bind(sd, (struct sockaddr *)&server, sizeof(server));
+    listen(sd, 5);
+
+    printf("Server listening...\n");
+
+    cli_len = sizeof(cli);
+    connfd = accept(sd, (struct sockaddr *)&cli, &cli_len);
+
+    while(1)
+    {
+        read(connfd, buffer, sizeof(buffer));
+
+        if(strcmp(buffer,"exit\n")==0)
+        {
+            printf("Client requested exit\n");
+            break;
+        }
+
+        printf("Client: %s", buffer);
+
+        sscanf(buffer, "%d", &n);
+
+        fibonacci(n, buffer);
+
+        write(connfd, buffer, strlen(buffer)+1);
+    }
+
+    close(connfd);
+    close(sd);
+}
