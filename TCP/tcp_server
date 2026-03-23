@@ -1,0 +1,58 @@
+#include <stdio.h>
+#include <sys/types.h>
+#include <sys/socket.h>
+#include <netinet/in.h>
+#include <string.h>
+#include <stdlib.h>
+#include <unistd.h>
+
+int main()
+{
+    struct sockaddr_in server, cli;
+    socklen_t cli_len;
+    int sd, connfd, port;
+    char buffer[100];
+    printf("Enter port number: ");
+    scanf("%d", &port);
+    getchar();
+    sd = socket(AF_INET, SOCK_STREAM, 0);
+    if (sd < 0) {
+        perror("Socket failed");
+        exit(1);
+    }
+    memset(&server, 0, sizeof(server));
+    server.sin_family = AF_INET;
+    server.sin_port = htons(port);
+    server.sin_addr.s_addr = INADDR_ANY;
+    if (bind(sd, (struct sockaddr *)&server, sizeof(server)) < 0) {
+        perror("Bind failed");
+        exit(1);
+    }
+    listen(sd, 5);
+    printf("Server listening...\n");
+    cli_len = sizeof(cli);
+    connfd = accept(sd, (struct sockaddr *)&cli, &cli_len);
+    if (connfd < 0) {
+        perror("Accept failed");
+        exit(1);
+    }
+    while (1) {
+        read(connfd, buffer, sizeof(buffer));
+        printf("Client: %s", buffer);
+        if (strcmp(buffer, "exit\n") == 0) {
+            printf("Client exited. Server closing...\n");
+            break;
+        }
+        printf("Server: ");
+        fgets(buffer, sizeof(buffer), stdin);
+        write(connfd, buffer, strlen(buffer) + 1);
+
+        if (strcmp(buffer, "exit\n") == 0) {
+            printf("Server exiting...\n");
+            break;
+        }
+    }
+    close(connfd);
+    close(sd);
+    return 0;
+}
