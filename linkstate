@@ -1,0 +1,104 @@
+#include <stdio.h>
+
+#define MAX 10
+#define INF 999
+
+void print_step(int step, int dist[], int selected[], int n) {
+    printf("Step %d:  ", step);
+    for (int i = 0; i < n; i++) {
+        if (selected[i]) printf("[%d] ", dist[i]); // Brackets mean node is finalized
+        else if (dist[i] == INF) printf("INF ");
+        else printf("%d  ", dist[i]);
+    }
+    printf("\n");
+}
+
+void linkStateRouting(int cost[MAX][MAX], int n, int source) {
+    int dist[MAX], prev[MAX], selected[MAX];
+    int count, min_dist, next_node;
+
+    // Initialize structures
+    for (int i = 0; i < n; i++) {
+        dist[i] = cost[source][i];
+        prev[i] = source;
+        selected[i] = 0;
+    }
+
+    dist[source] = 0;
+    selected[source] = 1;
+    count = 1;
+
+    printf("\n--- Algorithm Execution Steps (Distances from %d) ---\n", source);
+    printf("Step     ");
+    for(int i=0; i<n; i++) printf("R%d  ", i);
+    printf("\n-----------------------------------------------\n");
+
+    while (count < n) {
+        min_dist = INF;
+        next_node = -1;
+
+        // 1. SELECT: Pick the nearest unvisited neighbor
+        for (int i = 0; i < n; i++) {
+            if (!selected[i] && dist[i] < min_dist) {
+                min_dist = dist[i];
+                next_node = i;
+            }
+        }
+
+        if (next_node == -1) break; // Remaining nodes are unreachable
+
+        selected[next_node] = 1;
+        print_step(count, dist, selected, n);
+        count++;
+
+        // 2. UPDATE: Relax the edges (check if path through next_node is shorter)
+        for (int i = 0; i < n; i++) {
+            if (!selected[i] && (min_dist + cost[next_node][i] < dist[i])) {
+                dist[i] = min_dist + cost[next_node][i];
+                prev[i] = next_node;
+            }
+        }
+    }
+
+    // 3. DISPLAY FINAL ROUTING TABLE
+    printf("\n=============================================\n");
+    printf("        FINAL ROUTING TABLE FOR ROUTER %d    \n", source);
+    printf("=============================================\n");
+    printf(" Destination | Total Cost | Path (Reverse) \n");
+    printf("-------------|------------|------------------\n");
+    for (int i = 0; i < n; i++) {
+        if (i == source) continue;
+        
+        printf("    R%-7d |     %-6d | %d", i, dist[i], i);
+        int j = i;
+        while (j != source) {
+            j = prev[j];
+            printf(" <- %d", j);
+        }
+        printf("\n");
+    }
+    printf("=============================================\n");
+}
+
+int main() {
+    int n, cost[MAX][MAX], source;
+
+    printf("--- Link State Routing Simulation ---\n");
+    printf("Enter number of nodes: ");
+    scanf("%d", &n);
+
+    printf("Enter adjacency matrix (use 999 for infinity):\n");
+    for (int i = 0; i < n; i++) {
+        for (int j = 0; j < n; j++) {
+            scanf("%d", &cost[i][j]);
+            if (i == j) cost[i][j] = 0;
+        }
+    }
+
+    printf("\nEnter source router ID (0 to %d): ", n - 1);
+    scanf("%d", &source);
+
+    linkStateRouting(cost, n, source);
+
+    return 0;
+}
