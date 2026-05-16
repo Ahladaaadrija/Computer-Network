@@ -45,7 +45,7 @@ int main()
             break;
         }
 
-        memset(buffer, 0, sizeof(buffer)); // 🔥 important
+        memset(buffer, 0, sizeof(buffer));
 
         int n = read(sockfd, buffer, sizeof(buffer));
         if (n <= 0)
